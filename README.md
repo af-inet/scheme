@@ -1,3 +1,17 @@
-# scheleton
+# scheme
 
-A Scheme interpreter implemented in C.
+A scheme interpreter implemented in C.
+
+# build
+
+```
+git clone "https://github.com/af-inet/scheme"
+cd scheme
+make
+```
+
+# usage
+
+```
+./scheme <filename>
+```
