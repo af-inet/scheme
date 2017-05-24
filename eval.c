@@ -29,7 +29,7 @@ eval_if(struct scm_token *token)
 	_expr = token->children;
 	_then = token->children->next;
 	_else = token->children->next->next;
-	if (tmp = eval(_expr)) {
+	if (eval(_expr)) {
 		return eval(_then);
 	} else {
 		return eval(_else);

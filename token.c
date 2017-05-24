@@ -41,18 +41,18 @@ int digit_table[256] = {
 char
 str_to_int(int *dest, const char *ptr, int len)
 {
-    int i, digit, acc = 0;
+	int i, digit, acc = 0;
 
-    for (i = 0; i < len; i++)
+	for (i = 0; i < len; i++)
 	{
 		digit = digit_table[(unsigned)ptr[i]];
 		if (digit == -1)
 			return 1; /* failure */
 		acc = (acc * 10) + digit;
-    }
+	}
 
 	*dest = acc;
-    return 0; /* success */
+	return 0; /* success */
 }
 
 void
