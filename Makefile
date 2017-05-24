@@ -1,8 +1,8 @@
-TARGET  = skeme
+TARGET  = scheme
 CC      = gcc
-CFLAGS  = -Wall -I. -Wno-initializer-overrides
-OBJ     = main.o token.o
-HEADERS =        token.h
+CFLAGS  = -Wall -I. -Wno-initializer-overrides -Wno-missing-braces -Wpedantic -Wno-gnu-designator
+OBJ     = main.o token.o ast.o eval.o
+HEADERS =        token.h ast.h eval.h
 
 # where plexer will be installed
 INSTALL_DEST = /usr/local/bin

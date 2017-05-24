@@ -4,135 +4,153 @@
 
 #include "token.h"
 
-enum charset_t {
-	s_operator,
-	s_alphanumeric,
-	s_whitespace,
-	s_start,
-	s_eof,
-	s_unknown,
-};
-
 struct tokenizer {
 	const char *src;
 	const char *start;
-	struct skm_token *tokens;
-	enum charset_t last;
-	enum charset_t next;
+	struct scm_token *tokens;
 	size_t index;
 };
 
-const char *_operator =
-	"+-*()!";
-const char *_alphanumeric =
-	"abcdefghijklmnopqrstuvwxyz"
-	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	"1234567890";
-const char *_whitespace =
-	" \t\n\r\n";
+enum {
+	type_none = 0,
+	type_whitespace,
+	type_alpha,
+	type_numeric,
+};
 
-unsigned char
-char_in(const char c, const char *s)
+const char type_table[256] = {
+	[0 ... 255] = type_none,
+	[' '] = type_whitespace,
+	['\t'] = type_whitespace,
+	['\r'] = type_whitespace,
+	['\n'] = type_whitespace,
+	['a' ... 'z'] = type_alpha,
+	['A' ... 'Z'] = type_alpha,
+	['0' ... '9'] = type_numeric
+};
+
+unsigned char is_alpha(unsigned char c)      { return type_table[c] == type_alpha; }
+unsigned char is_whitespace(unsigned char c) { return type_table[c] == type_whitespace; }
+unsigned char is_numeric(unsigned char c)    { return type_table[c] == type_numeric; }
+
+int digit_table[256] = {
+	[0 ... 255] = -1,
+	['0'] = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+};
+
+char
+str_to_int(int *dest, const char *ptr, int len)
 {
-	while (*s)
-		if (c == *s++)
-			return 1;
-	return 0;
+    int i, digit, acc = 0;
+
+    for (i = 0; i < len; i++)
+	{
+		digit = digit_table[(unsigned)ptr[i]];
+		if (digit == -1)
+			return 1; /* failure */
+		acc = (acc * 10) + digit;
+    }
+
+	*dest = acc;
+    return 0; /* success */
 }
 
-enum charset_t
-charset(char c)
+void
+next_token(struct tokenizer *t)
 {
-	if (c == '\0') { return s_eof; }
-	if (char_in(c, _operator))     { return s_operator; }
-	if (char_in(c, _alphanumeric)) { return s_alphanumeric; }
-	if (char_in(c, _whitespace))   { return s_whitespace; }
-	return s_unknown;
-}
+	int tmp;
+	switch (*t->src) {
+	case '-':
+	case '+':
+	case '*':
+	case '!':
+		t->tokens[t->index++] = (struct scm_token){.type=T_OP, .ptr=t->src, .len=1};
+		t->src++;
+		break;
+	case '(':
+		t->tokens[t->index++] = (struct scm_token){.type=T_OPEN, .ptr=t->src, .len=1};
+		t->src++;
+		break;
+	case ')':
+		t->tokens[t->index++] = (struct scm_token){.type=T_CLOSE, .ptr=t->src, .len=1};
+		t->src++;
+		break;
+	default:
 
-int
-skm_next(struct tokenizer *t)
-{
-	switch (t->last) {
+		if (is_alpha(*t->src)) {
 
-	case s_start:
-	case s_whitespace:
-	case s_operator:
-		switch (t->next) {
-		case s_eof:
-		case s_whitespace:
-			return 0;
-		case s_alphanumeric:
-			t->tokens[t->index] = (struct skm_token){
-				.len = 1,
-				.ptr = t->src
+			/* create a symbol token */
+			t->tokens[t->index] = (struct scm_token) {
+				.type = T_SYM,
+				.ptr = t->src,
+				.len = 1
 			};
-			return 0;
-		case s_operator:
-			t->tokens[t->index] = (struct skm_token){
-				.len = 1,
-				.ptr = t->src
+
+			t->src++;
+
+			while (is_alpha(*t->src)) {
+				t->tokens[t->index].len += 1;
+				t->src++;
+			}
+
+			t->index++;
+
+		} else if (is_numeric(*t->src)) {
+
+			/* create a number token */
+			t->tokens[t->index] = (struct scm_token) {
+				.type = T_NUM,
+				.ptr = t->src,
+				.len = 1
 			};
-			t->index += 1;
-			return 0;
-		default: break;
+
+			t->src++;
+
+			while (is_numeric(*t->src)) {
+				t->tokens[t->index].len += 1;
+				t->src++;
+			}
+
+			if (str_to_int(&tmp,
+				t->tokens[t->index].ptr,
+				t->tokens[t->index].len)
+				== 0) {
+				t->tokens[t->index].value = tmp;
+			} else {
+				t->tokens[t->index].type = T_INVALID;
+				printf("failed to convert string to int [%d] '%c'\n", (int)(t->src - t->start), *t->src);
+			}
+
+			t->index++;
+
+		} else if (is_whitespace(*t->src)) {
+
+			/* do nothing */
+			t->src++;
+
+		} else {
+
+			/* unexpected character */
+			printf("unexpected [%d] '%c'\n", (int)(t->src - t->start), *t->src);
+			t->src++;
 		}
 		break;
-
-	case s_alphanumeric:
-		switch (t->next) {
-		case s_eof:
-		case s_whitespace:
-			t->index += 1;
-			return 0;
-		case s_alphanumeric:
-			t->tokens[t->index].len += 1;
-			return 0;
-		case s_operator:
-			t->index += 1;
-			t->tokens[t->index] = (struct skm_token){
-				.len = 1,
-				.ptr = t->src
-			};
-			t->index += 1;
-			return 0;
-		default: break;
-		}
-	default: break;
 	}
-	return -1;
 }
 
 int
-skm_tokenize(struct skm_token *tokens, size_t token_max, const char *src)
+scm_tokenize(struct scm_token *tokens, size_t token_max, const char *src)
 {
 	struct tokenizer *t = &(struct tokenizer){
 		.start = src,
 		.src = src,
 		.tokens = tokens,
-		.last = s_start,
 		.index = 0
 	};
-	
-	do
-	{
-		t->next = charset(*t->src);
 
-		if (skm_next(t) == -1)
-		{
-			printf("unexpected[%d] '%c'\n", (int)(t->src - t->start), *t->src);
-			return -1;
-		}
-
-		t->last = t->next;
-
-		if (t->index > token_max)
-		{
-			printf("ran out of tokens (%lu > %lu)\n", t->index, token_max);
-			return -1;
-		}
-
-	} while (*t->src++);
+	do {
+		next_token(t);
+	} while (*t->src);
 
 	return t->index;
 }
